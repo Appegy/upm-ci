@@ -62,7 +62,11 @@ jobs:
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           git switch -c "$BRANCH"
           git commit -am "chore: bump version to v$NEW"
-          git push -u origin "$BRANCH"
+          # Re-runnable: drop any stale bump branch for this version (closes its PR), push fresh.
+          git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
+          git push -u origin "$BRANCH" --force
+          # The delete above closes any prior PR for this head; open a fresh one (tolerate a race).
           gh pr create --base main --head "$BRANCH" \
             --title "chore: bump version to v$NEW" \
-            --body "Sets the package version to \`$NEW\` across package.json, PackageInfo.cs, README, and the dev project's bundleVersion. Merge, then run Release."
+            --body "Sets the package version to \`$NEW\` across package.json, PackageInfo.cs, README, and the dev project's bundleVersion. Merge, then run Release." \
+            || gh pr edit "$BRANCH" --title "chore: bump version to v$NEW"
