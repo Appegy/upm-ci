@@ -65,13 +65,17 @@ jobs:
       - name: Generate missing .meta files
         run: |
           # Unity ignores package assets that lack a .meta. src/ ships its own; the root-folded
-          # README/LICENSE/images do not, so synthesize deterministic ones (guid = md5 of the
-          # package-relative path, stable across releases).
+          # README/LICENSE/images do not, so synthesize deterministic ones. The guid is md5 of
+          # "<package-name>/<package-relative-path>" - namespacing by package name keeps it stable
+          # across releases AND unique per package, so README/LICENSE/images don't collide when
+          # several Appegy packages are installed in one Unity project (immutable PackageCache
+          # can't reassign a duplicate guid - it just drops the asset).
           cd pack
+          PKG="$(jq -r .name package.json)"
           find . -mindepth 1 \( -type f -o -type d \) ! -name '*.meta' | while read -r p; do
             [ -e "$p.meta" ] && continue
             rel="${p#./}"
-            guid="$(printf '%s' "$rel" | md5sum | cut -c1-32)"
+            guid="$(printf '%s' "$PKG/$rel" | md5sum | cut -c1-32)"
             {
               echo "fileFormatVersion: 2"
               echo "guid: $guid"
