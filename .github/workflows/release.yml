@@ -56,10 +56,11 @@ jobs:
           cp -R src/. pack/
           # README/LICENSE live at the repo root - fold them into the package.
           for f in README.md LICENSE; do
-            [ -f "$f" ] && cp "$f" pack/
+            if [ -f "$f" ]; then cp "$f" pack/; fi
           done
           # README references images/ with relative paths - ship them so it renders in Package Manager.
-          [ -d images ] && cp -R images pack/
+          # (if form, not `[ -d images ] && ...`: under `bash -e` a false test as the last command fails the step)
+          if [ -d images ]; then cp -R images pack/; fi
 
       - name: Generate missing .meta files
         run: |
