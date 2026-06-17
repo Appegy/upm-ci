@@ -31,6 +31,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Pull real LFS blobs (some packages ship binaries via LFS, e.g. source-generator
+          # DLLs). Without this the working tree holds 130-byte pointer files and `upm pack`
+          # would publish those instead of the actual binary.
+          lfs: true
 
       - name: Read package version
         id: pkg
