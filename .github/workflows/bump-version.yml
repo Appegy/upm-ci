@@ -1,0 +1,68 @@
+# Reusable version-bump workflow for Appegy UPM packages.
+# Computes the next version from the current one (patch/minor/major), syncs it everywhere it
+# lives, and opens a PR (main is protected). Auto-detects the package layout - no per-repo inputs
+# beyond the bump type.
+#
+# Caller (in a package repo):
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         type: { description: "Version bump", type: choice, options: [patch, minor, major], default: patch }
+#   jobs:
+#     bump:
+#       uses: Appegy/upm-ci/.github/workflows/bump-version.yml@v1
+#       with:
+#         type: ${{ inputs.type }}
+#       secrets: inherit
+
+name: Bump version (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      type:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Bump version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Bump and sync version
+        id: bump
+        run: |
+          # npm version increments from the current value; --no-git-tag-version: no commit/tag here.
+          ( cd src && npm version "${{ inputs.type }}" --no-git-tag-version >/dev/null )
+          NEW="$(jq -r .version src/package.json)"
+          echo "Bumped to $NEW"
+          # sync the version everywhere it lives (paths auto-detected, so this is repo-agnostic)
+          PKGINFO="$(find src -name PackageInfo.cs | head -1)"
+          [ -n "$PKGINFO" ] && sed -i -E "s/(public const string Version = \")[^\"]*(\";)/\1$NEW\2/" "$PKGINFO"
+          LAB="$(find . -maxdepth 1 -type d -name '*.Lab' | head -1)"
+          [ -n "$LAB" ] && sed -i -E "s/^(  bundleVersion: ).*/\1$NEW/" "$LAB/ProjectSettings/ProjectSettings.asset"
+          # README pins the version in the git-URL install example (?path=/src#x.y.z)
+          [ -f README.md ] && sed -i -E "s|(\?path=/src#)[0-9]+\.[0-9]+\.[0-9]+|\1$NEW|g" README.md
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Open version-bump PR (authored by whoever ran this)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEW="${{ steps.bump.outputs.version }}"
+          BRANCH="bump/v$NEW"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -am "chore: bump version to v$NEW"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore: bump version to v$NEW" \
+            --body "Sets the package version to \`$NEW\` across package.json, PackageInfo.cs, README, and the dev project's bundleVersion. Merge, then run Release."
