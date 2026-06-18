@@ -94,6 +94,19 @@ jobs:
             echo "generated meta: $rel"
           done
 
+      - name: Guard against unresolved git-LFS pointers
+        run: |
+          # A git-LFS pointer is a ~130-byte text file starting with this line. If one reaches
+          # pack/, the checkout did not fetch LFS and we'd ship a stub instead of the real binary
+          # (this is exactly how Union 1.1.0 shipped a 130-byte generator DLL). Fail loudly.
+          # grep -I skips real binaries, so only pointer *text* files can match.
+          hits="$(grep -rlI '^version https://git-lfs.github.com/spec/v1' pack 2>/dev/null || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::git-LFS pointer files packed instead of real content:"
+            echo "$hits"
+            exit 1
+          fi
+
       - name: Install Unity UPM CLI
         run: |
           curl -fsSL https://cdn.packages.unity.com/upm-cli/install.sh -o install.sh
