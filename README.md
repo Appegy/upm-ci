@@ -8,7 +8,7 @@ keeps a thin wrapper that calls these; fixes here apply to every package at once
 ## Layout expected in a package repo
 
 - `src/` - the published package (package.json, Runtime/Editor/Tests).
-- `Appegy.<Name>.Lab/` - the Unity dev project (auto-detected by the `*.Lab` name).
+- `lab/` or `Appegy.<Name>.Lab/` - the Unity dev project (auto-detected by the `lab` or `*.Lab` name).
 - `src/**/PackageInfo.cs` - holds `public const string Version` (auto-detected).
 - `README.md` / `LICENSE` / `images/` at the repo root - folded into the published package.
 
